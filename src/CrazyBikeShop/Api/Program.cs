@@ -1,10 +1,13 @@
 using System.Diagnostics;
+using System.Text.Json;
+using Api;
 using CrazyBikeShop.ServiceDefaults;
 using CrazyBikeShop.Shared;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.DurableTask;
 using Microsoft.DurableTask.Client;
+using Microsoft.DurableTask.ScheduledTasks;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,22 +36,75 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/schedule", async ([FromBody] Schedule schedule, [FromServices] DurableTaskClient durableTaskClient) =>
+app.MapPost("/schedule", async ([FromBody] ScheduleRequest scheduleRequest, [FromServices] ScheduledTaskClient scheduledTaskClient) =>
+{
+    try
     {
-        await RunSequentialOrchestrations(schedule, durableTaskClient);
-        return Results.Ok(new { Message = "Orchestrations scheduled and completed." });
-    })
-    .WithName("ScheduleOrchestration");
+        using var stream = new MemoryStream();
+        await JsonSerializer.SerializeAsync(stream, CrazyBikeSelector.GetOne());
+        stream.Position = 0;
+        var input = new StreamReader(stream).ReadToEnd();
+        
+        var creationOptions = new ScheduleCreationOptions(scheduleRequest.Id, scheduleRequest.OrchestrationName, scheduleRequest.Interval)
+        {
+            //OrchestrationInput = scheduleRequest.Input,
+            OrchestrationInput = input, 
+            StartAt = scheduleRequest.StartAt,
+            EndAt = scheduleRequest.EndAt,
+            StartImmediatelyIfLate = true
+        };
+
+        var scheduleClient = await scheduledTaskClient.CreateScheduleAsync(creationOptions);
+        var description = await scheduleClient.DescribeAsync();
+
+        app.Logger.LogInformation("Created new schedule with ID: {ScheduleId}", scheduleRequest.Id);
+
+        //await RunSequentialOrchestrations(scheduleRequest, durableTaskClient);
+        //return Results.Ok(new { Message = "Orchestrations scheduled and completed." });
+        
+        return Results.CreatedAtRoute("GetOrchestration", new { id = scheduleRequest.Id }, description);
+    }
+    catch (ScheduleClientValidationException ex)
+    {
+        app.Logger.LogError(ex, "Validation failed while creating schedule {ScheduleId}", scheduleRequest.Id);
+        return Results.BadRequest(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error creating schedule {ScheduleId}", scheduleRequest.Id);
+        return Results.InternalServerError(ex.Message);
+    }
+})
+.WithName("ScheduleOrchestration");
+
+app.MapGet("/schedule/{id}", async (string id, [FromServices] ScheduledTaskClient scheduledTaskClient) =>
+{
+    try
+    {
+        var schedule = await scheduledTaskClient.GetScheduleAsync(id);
+        return Results.Ok(schedule);
+    }
+    catch (ScheduleNotFoundException)
+    {
+        return Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error retrieving schedule {ScheduleId}", id);
+        return Results.InternalServerError(ex.Message);
+    }
+})
+.WithName("GetOrchestration");
 
 app.Run();
 return;
 
-async Task RunSequentialOrchestrations(Schedule schedule, DurableTaskClient client)
+async Task RunSequentialOrchestrations(BatchScheduleRequest batchScheduleRequest, DurableTaskClient client)
 {
     var completedOrchestrations = 0;     // Track total completed orchestrations
     var failedOrchestrations = 0;        // Track total failed orchestrations
     
-    var orchestrations = Enumerable.Range(1, schedule.TotalOrchestrations).Select(_ => new StartBikeOrderOrchestrator
+    var orchestrations = Enumerable.Range(1, batchScheduleRequest.TotalOrchestrations).Select(_ => new StartBikeOrderOrchestrator
     {
         InstanceId = Guid.NewGuid().ToString(),
         Bike = CrazyBikeSelector.GetOne()
@@ -83,10 +139,10 @@ async Task RunSequentialOrchestrations(Schedule schedule, DurableTaskClient clie
         }
         
         // Wait before scheduling next orchestration (except for the last one)
-        if (i < schedule.TotalOrchestrations - 1)
+        if (i < batchScheduleRequest.TotalOrchestrations - 1)
         {
-            app.Logger.LogInformation("Waiting {Seconds} seconds before scheduling next orchestration...", schedule.IntervalSeconds);
-            await Task.Delay(TimeSpan.FromSeconds(schedule.IntervalSeconds));
+            app.Logger.LogInformation("Waiting {Seconds} seconds before scheduling next orchestration...", batchScheduleRequest.IntervalSeconds);
+            await Task.Delay(TimeSpan.FromSeconds(batchScheduleRequest.IntervalSeconds));
         }
     }
     
