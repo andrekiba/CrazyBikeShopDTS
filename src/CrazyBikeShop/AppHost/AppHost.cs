@@ -19,8 +19,8 @@ if (builder.ExecutionContext.IsRunMode)
 {
     var scheduler =
         builder.AddContainer("scheduler", "mcr.microsoft.com/dts/dts-emulator", "latest")
-            .WithHttpEndpoint(name: "grpc", targetPort: 8080)
-            .WithHttpEndpoint(name: "dashboard", targetPort: 8082);
+            .WithHttpEndpoint(name: "grpc", port:8080, targetPort: 8080)
+            .WithHttpEndpoint(name: "dashboard", port:8082, targetPort: 8082);
     dts = builder.AddConnectionString("dts", 
         ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=default;Authentication=None"));
 }

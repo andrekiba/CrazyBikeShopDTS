@@ -19,14 +19,14 @@ using var loggerFactory = LoggerFactory.Create(loggingBuilder =>
 });
 var logger = loggerFactory.CreateLogger<Program>();
 
-var connectionString = CreateTaskHubConnection();
+//var connectionString = CreateTaskHubConnection();
 
 builder.Services.AddDurableTaskWorker()
     .AddTasks(registry =>
     {
         registry.AddActivity<CrazyBikeShop.Assembler.AssembleBikeActivity>();
     })
-    .UseDurableTaskScheduler(connectionString, options =>
+    .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
     {
         // Configure any options if needed
     });

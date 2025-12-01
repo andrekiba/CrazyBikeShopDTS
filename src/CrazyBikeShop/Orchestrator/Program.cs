@@ -1,4 +1,5 @@
 ﻿using CrazyBikeShop.ServiceDefaults;
+using Microsoft.DurableTask.ScheduledTasks;
 using Microsoft.DurableTask.Worker;
 using Microsoft.DurableTask.Worker.AzureManaged;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,18 +20,17 @@ using var loggerFactory = LoggerFactory.Create(loggingBuilder =>
 });
 var logger = loggerFactory.CreateLogger<Program>();
 
-var connectionString = CreateTaskHubConnection();
+//var connectionString = CreateTaskHubConnection();
 
-builder.Services.AddDurableTaskWorker()
-    .AddTasks(registry =>
+builder.Services.AddDurableTaskWorker(b =>
+{
+    b.AddTasks(r =>
     {
-        //registry.AddAllGeneratedTasks(); // This will add the tasks decorated with [DurableTask]
-        registry.AddOrchestrator<CrazyBikeShop.Orchestrator.CrazyBikeOrchestrator>();
-    })
-    .UseDurableTaskScheduler(connectionString, options =>
-    {
-        // Configure any options if needed
+        r.AddOrchestrator<CrazyBikeShop.Orchestrator.CrazyBikeOrchestrator>();
     });
+    b.UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!);
+    b.UseScheduledTasks();
+});
 
 var host = builder.Build();
 
