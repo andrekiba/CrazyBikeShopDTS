@@ -1,4 +1,5 @@
-﻿using Microsoft.DurableTask.Worker;
+﻿using CrazyBikeShop.ServiceDefaults;
+using Microsoft.DurableTask.Worker;
 using Microsoft.DurableTask.Worker.AzureManaged;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.Logging;
 
 // Configure the host builder
 var builder = Host.CreateApplicationBuilder();
+builder.AddServiceDefaults();
 // Configure logging
 builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Information);

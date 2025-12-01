@@ -1,7 +1,10 @@
 <Solution>
+  <Project Path="Api/Api.csproj" />
+  <Project Path="AppHost\AppHost.csproj" />
   <Project Path="Assembler/Assembler.csproj" />
   <Project Path="Client/Client.csproj" />
   <Project Path="Orchestrator/Orchestrator.csproj" />
+  <Project Path="ServiceDefaults\ServiceDefaults.csproj" />
   <Project Path="Shared/Shared.csproj" />
   <Project Path="Ship/Ship.csproj" />
 </Solution>

@@ -1,0 +1,24 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.0.0">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <UserSecretsId>4a9306e3-1d1a-4f8a-a7e0-124b3f530df4</UserSecretsId>
+        <RootNamespace>CrazyBikeShop.AppHost</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Api\Api.csproj" />
+      <ProjectReference Include="..\Assembler\Assembler.csproj" />
+      <ProjectReference Include="..\Client\Client.csproj" />
+      <ProjectReference Include="..\Orchestrator\Orchestrator.csproj" />
+      <ProjectReference Include="..\Ship\Ship.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Aspire.Hosting.AppHost" Version="13.0.1" />
+    </ItemGroup>
+
+</Project>
