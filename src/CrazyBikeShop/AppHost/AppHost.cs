@@ -103,7 +103,7 @@ var api = builder.AddProject<Projects.Api>("api")
     {
         var envParam = env.AsProvisioningParameter(infra);
         app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-api").Compile();
-        app.Template.Scale.MinReplicas = 1;
+        app.Template.Scale.MinReplicas = 0;
         app.Template.Scale.MaxReplicas = 2;
     });
 
