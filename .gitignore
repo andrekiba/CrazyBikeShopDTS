@@ -312,3 +312,6 @@ manifests
 next-steps.md
 aspire-manifest.json
 azure.yaml
+
+#aspire
+aspire-output/
