@@ -7,7 +7,7 @@ param location string = resourceGroup().location
 @description('IP Allow List')
 param ipAllowlist array = ['0.0.0.0/0']
 @description('Sku Name')
-param skuName string = 'Dedicated'
+param skuName string = 'Consumption'
 @description('Sku Capacity') 
 param skuCapacity int = 1
 @description('Tags') 
