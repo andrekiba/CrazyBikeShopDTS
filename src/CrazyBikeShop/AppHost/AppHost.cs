@@ -98,7 +98,6 @@ else
 var api = builder.AddProject<Projects.Api>("api")
     .WithReference(dts)
     .WaitFor(dts)
-    .WithAzureUserAssignedIdentity(identity)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -108,7 +107,6 @@ var api = builder.AddProject<Projects.Api>("api")
 var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
     .WithReference(dts)
     .WaitFor(dts)
-    .WithAzureUserAssignedIdentity(identity)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -136,7 +134,9 @@ var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
 if (builder.ExecutionContext.IsPublishMode)
 {
     api.WithReference(ai);
+    api.WithAzureUserAssignedIdentity(identity);
     orchestrator.WithReference(ai);
+    orchestrator.WithAzureUserAssignedIdentity(identity);
 }
 
 builder.Build().Run();
