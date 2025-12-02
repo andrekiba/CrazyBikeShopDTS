@@ -69,7 +69,7 @@ module dts_bicep 'dts-bicep/dts-bicep.bicep' = {
   scope: rg
   params: {
     location: location
-    dtsName: 'cbs-dts-${environment}-dts'
+    dtsName: 'cbs-${environment}-dts'
   }
 }
 
@@ -89,7 +89,7 @@ module identityAssignDTSDash 'identityAssignDTSDash/identityAssignDTSDash.bicep'
   scope: rg
   params: {
     location: location
-    principalId: '${userPrincipalId}'
+    principalId: userPrincipalId
     roleDefinitionId: '0ad04412-c4d5-4796-b79c-f76d14c8d402'
     principalType: 'User'
   }

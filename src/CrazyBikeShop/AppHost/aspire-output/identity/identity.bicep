@@ -4,7 +4,7 @@ param location string = resourceGroup().location
 param environment string
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
-  name: 'cbs-dts-${environment}-identity'
+  name: 'cbs-${environment}-identity'
   location: location
 }
 

@@ -10,7 +10,7 @@ param log_outputs_loganalyticsworkspaceid string
 param environment string
 
 resource ai 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'cbs-dts-${environment}-ai'
+  name: 'cbs-${environment}-ai'
   kind: kind
   location: location
   properties: {

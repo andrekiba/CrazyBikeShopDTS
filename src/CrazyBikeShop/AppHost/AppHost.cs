@@ -13,7 +13,7 @@ IResourceBuilder<IResourceWithConnectionString> ai = null!;
 IResourceBuilder<AzureBicepResource> dtsBicep = null!;
 IResourceBuilder<AzureUserAssignedIdentityResource> identity = null!;
 
-const string projectName = "cbs-dts";
+const string projectName = "cbs";
 
 if (builder.ExecutionContext.IsRunMode)
 {
@@ -66,7 +66,7 @@ else
             var resources = infra.GetProvisionableResources();
             var acr = resources.OfType<ContainerRegistryService>().Single();
             var envParam = env.AsProvisioningParameter(infra);
-            acr.Name = BicepFunction.Interpolate($"{projectName}{envParam}cr").Compile();
+            acr.Name = BicepFunction.Interpolate($"{projectName.Replace("-","")}{envParam}cr").Compile();
         });
     
     var cae = builder.AddAzureContainerAppEnvironment("cae")
@@ -90,7 +90,7 @@ else
         .WithParameter("principalType", "ServicePrincipal");
     
     var dtsDataContributorRoleForUser = builder.AddBicepTemplate("identityAssignDTSDash", "./bicep/role.bicep")
-        .WithParameter("principalId", ReferenceExpression.Create($"{userPrincipalId}"))
+        .WithParameter("principalId", userPrincipalId)
         .WithParameter("roleDefinitionId", durableTaskDataContributor)
         .WithParameter("principalType", "User");
 }

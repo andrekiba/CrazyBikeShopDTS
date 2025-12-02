@@ -36,7 +36,7 @@ resource log 'Microsoft.OperationalInsights/workspaces@2025-02-01' existing = {
 }
 
 resource cae 'Microsoft.App/managedEnvironments@2025-01-01' = {
-  name: 'cbs-dts-${environment}-cae'
+  name: 'cbs-${environment}-cae'
   location: location
   properties: {
     appLogsConfiguration: {

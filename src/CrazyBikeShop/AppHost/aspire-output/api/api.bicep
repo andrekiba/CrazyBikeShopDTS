@@ -24,7 +24,7 @@ param cae_outputs_azure_container_registry_endpoint string
 param cae_outputs_azure_container_registry_managed_identity_id string
 
 resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
-  name: 'cbs-dts-${environment}-api'
+  name: 'cbs-${environment}-api'
   location: location
   properties: {
     configuration: {
