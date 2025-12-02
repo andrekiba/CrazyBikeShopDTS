@@ -11,7 +11,8 @@ public class ShipBikeActivity(ILogger<ShipBikeActivity> logger) : TaskActivity<A
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            //delay between 5 and 20 seconds to simulate assembly time
+            await Task.Delay(TimeSpan.FromSeconds(Random.Shared.Next(5, 21)));
         
             var shippedBike = new ShippedBike
             {

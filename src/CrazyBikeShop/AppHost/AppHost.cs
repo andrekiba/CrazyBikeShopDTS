@@ -82,7 +82,7 @@ else
     
     dtsBicep = builder.AddBicepTemplate("dts-bicep", "./bicep/dts.bicep")
         .WithParameter("dtsName", ReferenceExpression.Create($"{projectName}-{env}-dts"));
-    dts = builder.AddConnectionString("dts", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=default;Authentication=AzureDefault"));
+    dts = builder.AddConnectionString("dts", ReferenceExpression.Create($"Endpoint={dtsBicep.GetOutput("dts_endpoint")};TaskHub=default;Authentication=DefaultAzure"));
     
     var dtsDataContributorRoleForApps = builder.AddBicepTemplate("identityAssignDTS", "./bicep/role.bicep")
         .WithParameter("principalId", identity.Resource.PrincipalId)
@@ -98,10 +98,13 @@ else
 var api = builder.AddProject<Projects.Api>("api")
     .WithReference(dts)
     .WaitFor(dts)
+    .WithExternalHttpEndpoints()
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
         app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-api").Compile();
+        app.Template.Scale.MinReplicas = 1;
+        app.Template.Scale.MaxReplicas = 2;
     });
 
 var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
@@ -113,6 +116,7 @@ var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
         app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-orchestrator").Compile();
         app.Template.Scale.MinReplicas = 0;
         app.Template.Scale.MaxReplicas = 5;
+        app.Template.Scale.PollingInterval = 5;
         app.Template.Scale.Rules.Add(new ContainerAppScaleRule
         {
             Name = "dts-orchestration-scaler",

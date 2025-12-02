@@ -11,7 +11,8 @@ public class AssembleBikeActivity(ILogger<AssembleBikeActivity> logger) : TaskAc
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            //delay between 5 and 30 seconds to simulate assembly time
+            await Task.Delay(TimeSpan.FromSeconds(Random.Shared.Next(5, 31)));
 
             var assembledBike = new AssembledBike
             {
