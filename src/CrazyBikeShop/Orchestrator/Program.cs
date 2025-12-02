@@ -1,4 +1,5 @@
-﻿using CrazyBikeShop.ServiceDefaults;
+﻿using CrazyBikeShop.Orchestrator;
+using CrazyBikeShop.ServiceDefaults;
 using Microsoft.DurableTask.ScheduledTasks;
 using Microsoft.DurableTask.Worker;
 using Microsoft.DurableTask.Worker.AzureManaged;
@@ -26,10 +27,13 @@ builder.Services.AddDurableTaskWorker(b =>
 {
     b.AddTasks(r =>
     {
-        r.AddOrchestrator<CrazyBikeShop.Orchestrator.CrazyBikeOrchestrator>();
+        r.AddOrchestrator<CrazyBikeOrchestrator>();
     });
-    b.UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!);
-    b.UseScheduledTasks();
+    b.UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts-orchestrator")!, options =>
+    {
+        // Configure any options if needed
+    });
+    //b.UseScheduledTasks();
 });
 
 var host = builder.Build();

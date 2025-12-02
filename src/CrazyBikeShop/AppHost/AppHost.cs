@@ -4,10 +4,13 @@ using Azure.Provisioning.ContainerRegistry;
 using Azure.Provisioning.Expressions;
 using Azure.Provisioning.Resources;
 
-const string durableTaskSchedulerAdmin = "0ad04412-c4d5-4796-b79c-f76d14c8d402";
+const string durableTaskDataContributor = "0ad04412-c4d5-4796-b79c-f76d14c8d402";
+const string taskHubNames= "orchestrator,assembler,ship";
 var builder = DistributedApplication.CreateBuilder(args);
 
-IResourceBuilder<IResourceWithConnectionString> dts;
+IResourceBuilder<IResourceWithConnectionString> dtsOrchestrator;
+IResourceBuilder<IResourceWithConnectionString> dtsAssembler;
+IResourceBuilder<IResourceWithConnectionString> dtsShip;
 IResourceBuilder<IResourceWithConnectionString> ai = null!;
 IResourceBuilder<ParameterResource> env = null!;
 IResourceBuilder<AzureUserAssignedIdentityResource> identity = null!;
@@ -20,9 +23,17 @@ if (builder.ExecutionContext.IsRunMode)
     var scheduler =
         builder.AddContainer("scheduler", "mcr.microsoft.com/dts/dts-emulator", "latest")
             .WithHttpEndpoint(name: "grpc", port:8080, targetPort: 8080)
-            .WithHttpEndpoint(name: "dashboard", port:8082, targetPort: 8082);
-    dts = builder.AddConnectionString("dts", 
-        ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=default;Authentication=None"));
+            .WithHttpEndpoint(name: "dashboard", port:8082, targetPort: 8082)
+            .WithEnvironment("DTS_TASK_HUB_NAMES", taskHubNames);
+    dtsOrchestrator = builder.AddConnectionString("dts-orchestrator", 
+        ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=orchestrator;Authentication=None"))
+        .WaitFor(scheduler);
+    dtsAssembler = builder.AddConnectionString("dts-assembler", 
+            ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=assembler;Authentication=None"))
+        .WaitFor(scheduler);
+    dtsShip = builder.AddConnectionString("dts-ship", 
+            ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=ship;Authentication=None"))
+        .WaitFor(scheduler);
 }
 else
 {
@@ -74,11 +85,13 @@ else
     //dts = builder.AddConnectionString("dts");
     dtsBicep = builder.AddBicepTemplate("dts", "./bicep/dts.bicep")
         .WithParameter("dtsName", $"{projectName}-{env}-dts");
-    dts = builder.AddConnectionString("dts", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")}"));
+    dtsOrchestrator = builder.AddConnectionString("dts-orchestrator", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=orchestrator;Authentication=AzureDefault"));
+    dtsAssembler = builder.AddConnectionString("dts-assembler", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=assembler;Authentication=AzureDefault"));
+    dtsShip = builder.AddConnectionString("dts-ship", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=ship;Authentication=AzureDefault"));
 
     var dtsAdminRole = builder.AddBicepTemplate("identityAssignDTS", "./bicep/role.bicep")
         .WithParameter("principalId", identity.Resource.PrincipalId)
-        .WithParameter("roleDefinitionId", durableTaskSchedulerAdmin)
+        .WithParameter("roleDefinitionId", durableTaskDataContributor)
         .WithParameter("principalType", "ServicePrincipal");
     
     // var role2 = builder.AddBicepTemplate("identityAssignDTSDash", "./bicep/role.bicep")
@@ -89,8 +102,8 @@ else
 
 //builder.AddProject<Projects.Client>("client");
 var api = builder.AddProject<Projects.Api>("api")
-    .WithReference(dts)
-    .WaitFor(dts)
+    .WithReference(dtsOrchestrator)
+    .WaitFor(dtsOrchestrator)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -103,8 +116,8 @@ var api = builder.AddProject<Projects.Api>("api")
     });
 
 var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
-    .WithReference(dts)
-    .WaitFor(dts)
+    .WithReference(dtsOrchestrator)
+    .WaitFor(dtsOrchestrator)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -129,7 +142,7 @@ var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
                             Metadata =
                             {
                                 { "endpoint", BicepFunction.Interpolate($"{dtsBicep.GetOutput("dts_endpoint")}") },
-                                { "taskhubName", BicepFunction.Interpolate($"{dtsBicep.GetOutput("taskhub_name")}") },
+                                { "taskhubName", "orchestrator" },
                                 { "maxConcurrentWorkItemsCount", "1" },
                                 { "workItemType", "Orchestration" }
                             },
@@ -142,8 +155,8 @@ var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
     });
 
 var assembler = builder.AddProject<Projects.Assembler>("assembler")
-    .WithReference(dts)
-    .WaitFor(dts)
+    .WithReference(dtsAssembler)
+    .WaitFor(dtsAssembler)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -168,7 +181,7 @@ var assembler = builder.AddProject<Projects.Assembler>("assembler")
                             Metadata =
                             {
                                 { "endpoint", BicepFunction.Interpolate($"{dtsBicep.GetOutput("dts_endpoint")}") },
-                                { "taskhubName", BicepFunction.Interpolate($"{dtsBicep.GetOutput("taskhub_name")}") },
+                                { "taskhubName", "assembler" },
                                 { "maxConcurrentWorkItemsCount", "1" },
                                 { "workItemType", "Activity" }
                             },
@@ -181,8 +194,8 @@ var assembler = builder.AddProject<Projects.Assembler>("assembler")
     });
 
 var ship = builder.AddProject<Projects.Ship>("ship")
-    .WithReference(dts)
-    .WaitFor(dts)
+    .WithReference(dtsShip)
+    .WaitFor(dtsShip)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -207,7 +220,7 @@ var ship = builder.AddProject<Projects.Ship>("ship")
                             Metadata =
                             {
                                 { "endpoint", BicepFunction.Interpolate($"{dtsBicep.GetOutput("dts_endpoint")}") },
-                                { "taskhubName", BicepFunction.Interpolate($"{dtsBicep.GetOutput("taskhub_name")}") },
+                                { "taskhubName", "ship" },
                                 { "maxConcurrentWorkItemsCount", "1" },
                                 { "workItemType", "Activity" }
                             },

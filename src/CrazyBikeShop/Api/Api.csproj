@@ -9,9 +9,10 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0"/>
-        <PackageReference Include="Microsoft.DurableTask.ScheduledTasks" Version="1.17.1-preview.1" />
         <PackageReference Include="Scalar.AspNetCore" Version="2.11.0" />
         <PackageReference Include="Microsoft.DurableTask.Client.AzureManaged" Version="1.17.1" />
+        <PackageReference Include="Microsoft.DurableTask.Worker.AzureManaged" Version="1.17.1" />
+        <PackageReference Include="Microsoft.DurableTask.ScheduledTasks" Version="1.17.1-preview.1" />
         <PackageReference Include="Microsoft.DurableTask.Generators" Version="1.0.0-preview.1" />
         <PackageReference Include="System.Text.Json" Version="10.0.0" />
     </ItemGroup>

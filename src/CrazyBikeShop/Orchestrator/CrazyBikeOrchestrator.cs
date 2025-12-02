@@ -4,32 +4,29 @@ using Microsoft.Extensions.Logging;
 
 namespace CrazyBikeShop.Orchestrator;
 
-[DurableTask]
+//[DurableTask]
 public class CrazyBikeOrchestrator : TaskOrchestrator<Bike, string>
 {
     public override async Task<string> RunAsync(TaskOrchestrationContext context, Bike bike)
     {
-        // Step 1: Assemble the bike
-        var assembledBike = await context.CallActivityAsync<string>("AssembleBikeActivity", bike);
+        var logger = context.CreateReplaySafeLogger(nameof(CrazyBikeOrchestrator));
         
-        // Step 2: Ship the bike
-        var shipConfirmation = await context.CallActivityAsync<string>("ShipBikeActivity", assembledBike);
-        
-        // Step 3: Finalize the response
-        var finalResponse = await context.CallActivityAsync<string>(nameof(FinalizeResponseActivity), shipConfirmation);
-        
-        return finalResponse;
-    }
-}
-
-[DurableTask]
-public class FinalizeResponseActivity(ILogger<FinalizeResponseActivity> logger) : TaskActivity<string, string>
-{
-    public override Task<string> RunAsync(TaskActivityContext context, string shipConfirmation)
-    {
-        logger.LogInformation("Activity FinalizeResponse called with response: {Response}", shipConfirmation);
-        
-        // Third activity that finalizes the response
-        return Task.FromResult(shipConfirmation);
+        try
+        {
+            // Step 1: Assemble the bike
+            logger.LogInformation("Starting bike assembly for Bike ID: {BikeId}", bike.Id);
+            var assembledBike = await context.CallActivityAsync<AssembledBike>("AssembleBikeActivity", bike);
+            
+            // Step 2: Ship the bike
+            logger.LogInformation("Starting bike shipping for Bike ID: {BikeId}", bike.Id);
+            var shippedBike = await context.CallActivityAsync<ShippedBike>("ShipBikeActivity", assembledBike);
+            
+            return shippedBike.Message;
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "An error occurred in CrazyBikeOrchestrator for Bike ID: {BikeId}", bike.Id);
+            throw;
+        }
     }
 }

@@ -1,4 +1,5 @@
-﻿using CrazyBikeShop.ServiceDefaults;
+﻿using CrazyBikeShop.Assembler;
+using CrazyBikeShop.ServiceDefaults;
 using Microsoft.DurableTask.Worker;
 using Microsoft.DurableTask.Worker.AzureManaged;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,9 +25,9 @@ var logger = loggerFactory.CreateLogger<Program>();
 builder.Services.AddDurableTaskWorker()
     .AddTasks(registry =>
     {
-        registry.AddActivity<CrazyBikeShop.Assembler.AssembleBikeActivity>();
+        registry.AddActivity<AssembleBikeActivity>();
     })
-    .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
+    .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts-assembler")!, options =>
     {
         // Configure any options if needed
     });

@@ -25,7 +25,7 @@ public static class CrazyBikeSelector
 
         var bikeGen = new Faker<Bike>()
             .RuleFor(x => x.Id, () => Guid.NewGuid().ToString())
-            .RuleFor(x => x.Price, f => f.Random.Number(200,10000))
+            .RuleFor(x => x.Price, f => f.Random.Number(200, 10000))
             .RuleFor(x => x.Model, f => string.IsNullOrEmpty(model) ? f.PickRandom(BikeModels) : model)
             .RuleFor(u => u.Parts, f => bikePartGen.Generate(f.Random.Number(6,BikePartNames.Length)));
             

@@ -1,4 +1,5 @@
 ﻿using CrazyBikeShop.ServiceDefaults;
+using CrazyBikeShop.Ship;
 using Microsoft.DurableTask.Worker;
 using Microsoft.DurableTask.Worker.AzureManaged;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,9 +25,9 @@ var logger = loggerFactory.CreateLogger<Program>();
 builder.Services.AddDurableTaskWorker()
     .AddTasks(registry =>
     {
-        registry.AddActivity<CrazyBikeShop.Ship.ShipBikeActivity>();
+        registry.AddActivity<ShipBikeActivity>();
     })
-    .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
+    .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts-ship")!, options =>
     {
         // Configure any options if needed
     });

@@ -1,26 +1,33 @@
+using CrazyBikeShop.Shared;
 using Microsoft.DurableTask;
 using Microsoft.Extensions.Logging;
 
 namespace CrazyBikeShop.Ship;
 
-[DurableTask]
-public class ShipBikeActivity : TaskActivity<string, string>
+//[DurableTask]
+public class ShipBikeActivity(ILogger<ShipBikeActivity> logger) : TaskActivity<AssembledBike, ShippedBike>
 {
-    readonly ILogger<ShipBikeActivity> logger;
-
-    public ShipBikeActivity(ILogger<ShipBikeActivity> logger)
+    public override async Task<ShippedBike> RunAsync(TaskActivityContext context, AssembledBike assembledBike)
     {
-        this.logger = logger;
-    }
-
-    public override async Task<string> RunAsync(TaskActivityContext context, string assembledBike)
-    {
-        await Task.Delay(TimeSpan.FromSeconds(5));
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
         
-        var shipConfirmation = $"Bike {assembledBike} shipped!";
+            var shippedBike = new ShippedBike
+            {
+                Id = assembledBike.Id,
+                Model =  assembledBike.Model,
+                Message = $"Bike {assembledBike.Model} with ID {assembledBike.Id} shipped!"
+            };
         
-        logger.LogInformation("ShipBikeActivity called with response: {ShipConfirmation}", shipConfirmation);
+            logger.LogInformation("ShipBikeActivity called with response: {Message}", shippedBike.Message);
         
-        return assembledBike;
+            return shippedBike;
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "An error occurred in ShipBikeActivity for Bike ID: {BikeId}", assembledBike.Id);
+            throw;
+        }
     }
 }
