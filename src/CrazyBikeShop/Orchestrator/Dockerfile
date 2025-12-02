@@ -7,6 +7,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Orchestrator/Orchestrator.csproj", "Orchestrator/"]
 COPY ["Shared/Shared.csproj", "Shared/"]
+COPY ["ServiceDefaults/ServiceDefaults.csproj", "ServiceDefaults/"]
 RUN dotnet restore "Orchestrator/Orchestrator.csproj"
 COPY . .
 WORKDIR "/src/Orchestrator"

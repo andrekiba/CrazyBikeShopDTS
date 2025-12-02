@@ -7,13 +7,13 @@ using Azure.Provisioning.Resources;
 const string durableTaskDataContributor = "0ad04412-c4d5-4796-b79c-f76d14c8d402";
 var builder = DistributedApplication.CreateBuilder(args);
 
+IResourceBuilder<ParameterResource> env = null!;
 IResourceBuilder<IResourceWithConnectionString> dts;
 IResourceBuilder<IResourceWithConnectionString> ai = null!;
-IResourceBuilder<ParameterResource> env = null!;
-IResourceBuilder<AzureUserAssignedIdentityResource> identity = null!;
 IResourceBuilder<AzureBicepResource> dtsBicep = null!;
+IResourceBuilder<AzureUserAssignedIdentityResource> identity = null!;
 
-const string projectName = "crazybikeshop";
+const string projectName = "cbs-dts";
 
 if (builder.ExecutionContext.IsRunMode)
 {
@@ -28,8 +28,16 @@ if (builder.ExecutionContext.IsRunMode)
 else
 {
     env = builder.AddParameter("environment");
+    var userPrincipalId = builder.AddParameter("userPrincipalId");
 
-    identity = builder.AddAzureUserAssignedIdentity("identity");
+    identity = builder.AddAzureUserAssignedIdentity("identity")
+        .ConfigureInfrastructure(infra =>
+        {
+            var resources = infra.GetProvisionableResources();
+            var i = resources.OfType<Azure.Provisioning.Roles.UserAssignedIdentity>().Single();
+            var envParam = env.AsProvisioningParameter(infra);
+            i.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-identity").Compile();
+        });
     
     var log = builder.AddAzureLogAnalyticsWorkspace("log")
         .ConfigureInfrastructure(infra =>
@@ -72,73 +80,57 @@ else
         .WithAzureContainerRegistry(acr)
         .WithAzureLogAnalyticsWorkspace(log);
     
-    //dts = builder.AddConnectionString("dts");
-    dtsBicep = builder.AddBicepTemplate("dts", "./bicep/dts.bicep")
-        .WithParameter("dtsName", $"{projectName}-{env}-dts");
-    dts = builder.AddConnectionString("dts-orchestrator", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=default;Authentication=AzureDefault"));
+    dtsBicep = builder.AddBicepTemplate("dts-bicep", "./bicep/dts.bicep")
+        .WithParameter("dtsName", ReferenceExpression.Create($"{projectName}-{env}-dts"));
+    dts = builder.AddConnectionString("dts", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=default;Authentication=AzureDefault"));
     
-    var dtsAdminRole = builder.AddBicepTemplate("identityAssignDTS", "./bicep/role.bicep")
+    var dtsDataContributorRoleForApps = builder.AddBicepTemplate("identityAssignDTS", "./bicep/role.bicep")
         .WithParameter("principalId", identity.Resource.PrincipalId)
         .WithParameter("roleDefinitionId", durableTaskDataContributor)
         .WithParameter("principalType", "ServicePrincipal");
     
-    // var role2 = builder.AddBicepTemplate("identityAssignDTSDash", "./bicep/role.bicep")
-    //     .WithParameter("principalId", "userPrincipalId")
-    //     .WithParameter("roleDefinitionId", durableTaskSchedulerAdmin)
-    //     .WithParameter("principalType", "User");
+    var dtsDataContributorRoleForUser = builder.AddBicepTemplate("identityAssignDTSDash", "./bicep/role.bicep")
+        .WithParameter("principalId", ReferenceExpression.Create($"{userPrincipalId}"))
+        .WithParameter("roleDefinitionId", durableTaskDataContributor)
+        .WithParameter("principalType", "User");
 }
 
 var api = builder.AddProject<Projects.Api>("api")
     .WithReference(dts)
     .WaitFor(dts)
+    .WithAzureUserAssignedIdentity(identity)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
         app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-api").Compile();
-        app.Identity = new ManagedServiceIdentity
-        {
-            ManagedServiceIdentityType = ManagedServiceIdentityType.UserAssigned,
-            UserAssignedIdentities = { { identity.Resource.Id.ToString()!, new UserAssignedIdentityDetails() } }
-        };
     });
 
 var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
     .WithReference(dts)
     .WaitFor(dts)
+    .WithAzureUserAssignedIdentity(identity)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
         app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-orchestrator").Compile();
-        app.Identity = new ManagedServiceIdentity
+        app.Template.Scale.MinReplicas = 0;
+        app.Template.Scale.MaxReplicas = 5;
+        app.Template.Scale.Rules.Add(new ContainerAppScaleRule
         {
-            ManagedServiceIdentityType = ManagedServiceIdentityType.UserAssigned,
-            UserAssignedIdentities = { { identity.Resource.Id.ToString()!, new UserAssignedIdentityDetails() } }
-        };
-        app.Template = new ContainerAppTemplate
-        {
-            Scale = new ContainerAppScale
+            Name = "dts-orchestration-scaler",
+            Custom = new ContainerAppCustomScaleRule
             {
-                MinReplicas = 0,
-                MaxReplicas = 5,
-                Rules =
+                CustomScaleRuleType = "azure-durabletask-scheduler",
+                Metadata =
                 {
-                    new ContainerAppScaleRule
-                    {
-                        Custom = new ContainerAppCustomScaleRule
-                        {
-                            Metadata =
-                            {
-                                { "endpoint", BicepFunction.Interpolate($"{dtsBicep.GetOutput("dts_endpoint")}") },
-                                { "taskhubName", BicepFunction.Interpolate($"{dtsBicep.GetOutput("taskhub_name")}") },
-                                { "maxConcurrentWorkItemsCount", "1" },
-                                { "workItemType", "Orchestration" }
-                            },
-                            Identity = BicepFunction.Interpolate($"{identity.Resource.Id}")
-                        }
-                    }
-                }
+                    { "endpoint", dtsBicep.GetOutput("dts_endpoint").AsProvisioningParameter(infra) },
+                    { "taskhubName", dtsBicep.GetOutput("taskhub_name").AsProvisioningParameter(infra) },
+                    { "maxConcurrentWorkItemsCount", "1" },
+                    { "workItemType", "Orchestration" }
+                },
+                Identity = identity.Resource.Id.AsProvisioningParameter(infra)
             }
-        };
+        });
     });
 
 if (builder.ExecutionContext.IsPublishMode)
