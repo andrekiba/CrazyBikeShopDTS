@@ -15,11 +15,11 @@ public class CrazyBikeOrchestrator : TaskOrchestrator<Bike, string>
         {
             // Step 1: Assemble the bike
             logger.LogInformation("Starting bike assembly for Bike ID: {BikeId}", bike.Id);
-            var assembledBike = await context.CallActivityAsync<AssembledBike>("AssembleBikeActivity", bike);
+            var assembledBike = await context.CallActivityAsync<AssembledBike>(nameof(AssembleBikeActivity), bike);
             
             // Step 2: Ship the bike
             logger.LogInformation("Starting bike shipping for Bike ID: {BikeId}", bike.Id);
-            var shippedBike = await context.CallActivityAsync<ShippedBike>("ShipBikeActivity", assembledBike);
+            var shippedBike = await context.CallActivityAsync<ShippedBike>(nameof(ShipBikeActivity), assembledBike);
             
             return shippedBike.Message;
         }

@@ -11,10 +11,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Api\Api.csproj"/>
-        <ProjectReference Include="..\Assembler\Assembler.csproj"/>
-        <ProjectReference Include="..\Client\Client.csproj"/>
         <ProjectReference Include="..\Orchestrator\Orchestrator.csproj"/>
-        <ProjectReference Include="..\Ship\Ship.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

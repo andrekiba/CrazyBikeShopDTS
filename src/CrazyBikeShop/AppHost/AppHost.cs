@@ -5,12 +5,9 @@ using Azure.Provisioning.Expressions;
 using Azure.Provisioning.Resources;
 
 const string durableTaskDataContributor = "0ad04412-c4d5-4796-b79c-f76d14c8d402";
-const string taskHubNames= "orchestrator,assembler,ship";
 var builder = DistributedApplication.CreateBuilder(args);
 
-IResourceBuilder<IResourceWithConnectionString> dtsOrchestrator;
-IResourceBuilder<IResourceWithConnectionString> dtsAssembler;
-IResourceBuilder<IResourceWithConnectionString> dtsShip;
+IResourceBuilder<IResourceWithConnectionString> dts;
 IResourceBuilder<IResourceWithConnectionString> ai = null!;
 IResourceBuilder<ParameterResource> env = null!;
 IResourceBuilder<AzureUserAssignedIdentityResource> identity = null!;
@@ -23,16 +20,9 @@ if (builder.ExecutionContext.IsRunMode)
     var scheduler =
         builder.AddContainer("scheduler", "mcr.microsoft.com/dts/dts-emulator", "latest")
             .WithHttpEndpoint(name: "grpc", port:8080, targetPort: 8080)
-            .WithHttpEndpoint(name: "dashboard", port:8082, targetPort: 8082)
-            .WithEnvironment("DTS_TASK_HUB_NAMES", taskHubNames);
-    dtsOrchestrator = builder.AddConnectionString("dts-orchestrator", 
-        ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=orchestrator;Authentication=None"))
-        .WaitFor(scheduler);
-    dtsAssembler = builder.AddConnectionString("dts-assembler", 
-            ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=assembler;Authentication=None"))
-        .WaitFor(scheduler);
-    dtsShip = builder.AddConnectionString("dts-ship", 
-            ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=ship;Authentication=None"))
+            .WithHttpEndpoint(name: "dashboard", port:8082, targetPort: 8082);
+    dts = builder.AddConnectionString("dts", 
+        ReferenceExpression.Create($"Endpoint={scheduler.GetEndpoint("grpc")};TaskHub=default;Authentication=None"))
         .WaitFor(scheduler);
 }
 else
@@ -85,10 +75,8 @@ else
     //dts = builder.AddConnectionString("dts");
     dtsBicep = builder.AddBicepTemplate("dts", "./bicep/dts.bicep")
         .WithParameter("dtsName", $"{projectName}-{env}-dts");
-    dtsOrchestrator = builder.AddConnectionString("dts-orchestrator", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=orchestrator;Authentication=AzureDefault"));
-    dtsAssembler = builder.AddConnectionString("dts-assembler", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=assembler;Authentication=AzureDefault"));
-    dtsShip = builder.AddConnectionString("dts-ship", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=ship;Authentication=AzureDefault"));
-
+    dts = builder.AddConnectionString("dts-orchestrator", ReferenceExpression.Create($"{dtsBicep.GetOutput("dts_endpoint")};TaskHub=default;Authentication=AzureDefault"));
+    
     var dtsAdminRole = builder.AddBicepTemplate("identityAssignDTS", "./bicep/role.bicep")
         .WithParameter("principalId", identity.Resource.PrincipalId)
         .WithParameter("roleDefinitionId", durableTaskDataContributor)
@@ -100,10 +88,9 @@ else
     //     .WithParameter("principalType", "User");
 }
 
-//builder.AddProject<Projects.Client>("client");
 var api = builder.AddProject<Projects.Api>("api")
-    .WithReference(dtsOrchestrator)
-    .WaitFor(dtsOrchestrator)
+    .WithReference(dts)
+    .WaitFor(dts)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -116,8 +103,8 @@ var api = builder.AddProject<Projects.Api>("api")
     });
 
 var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
-    .WithReference(dtsOrchestrator)
-    .WaitFor(dtsOrchestrator)
+    .WithReference(dts)
+    .WaitFor(dts)
     .PublishAsAzureContainerApp((infra, app) =>
     {
         var envParam = env.AsProvisioningParameter(infra);
@@ -142,87 +129,9 @@ var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
                             Metadata =
                             {
                                 { "endpoint", BicepFunction.Interpolate($"{dtsBicep.GetOutput("dts_endpoint")}") },
-                                { "taskhubName", "orchestrator" },
+                                { "taskhubName", BicepFunction.Interpolate($"{dtsBicep.GetOutput("taskhub_name")}") },
                                 { "maxConcurrentWorkItemsCount", "1" },
                                 { "workItemType", "Orchestration" }
-                            },
-                            Identity = BicepFunction.Interpolate($"{identity.Resource.Id}")
-                        }
-                    }
-                }
-            }
-        };
-    });
-
-var assembler = builder.AddProject<Projects.Assembler>("assembler")
-    .WithReference(dtsAssembler)
-    .WaitFor(dtsAssembler)
-    .PublishAsAzureContainerApp((infra, app) =>
-    {
-        var envParam = env.AsProvisioningParameter(infra);
-        app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-assembler").Compile();
-        app.Identity = new ManagedServiceIdentity
-        {
-            ManagedServiceIdentityType = ManagedServiceIdentityType.UserAssigned,
-            UserAssignedIdentities = { { identity.Resource.Id.ToString()!, new UserAssignedIdentityDetails() } }
-        };
-        app.Template = new ContainerAppTemplate
-        {
-            Scale = new ContainerAppScale
-            {
-                MinReplicas = 0,
-                MaxReplicas = 5,
-                Rules =
-                {
-                    new ContainerAppScaleRule
-                    {
-                        Custom = new ContainerAppCustomScaleRule
-                        {
-                            Metadata =
-                            {
-                                { "endpoint", BicepFunction.Interpolate($"{dtsBicep.GetOutput("dts_endpoint")}") },
-                                { "taskhubName", "assembler" },
-                                { "maxConcurrentWorkItemsCount", "1" },
-                                { "workItemType", "Activity" }
-                            },
-                            Identity = BicepFunction.Interpolate($"{identity.Resource.Id}")
-                        }
-                    }
-                }
-            }
-        };
-    });
-
-var ship = builder.AddProject<Projects.Ship>("ship")
-    .WithReference(dtsShip)
-    .WaitFor(dtsShip)
-    .PublishAsAzureContainerApp((infra, app) =>
-    {
-        var envParam = env.AsProvisioningParameter(infra);
-        app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-ship").Compile();
-        app.Identity = new ManagedServiceIdentity
-        {
-            ManagedServiceIdentityType = ManagedServiceIdentityType.UserAssigned,
-            UserAssignedIdentities = { { identity.Resource.Id.ToString()!, new UserAssignedIdentityDetails() } }
-        };
-        app.Template = new ContainerAppTemplate
-        {
-            Scale = new ContainerAppScale
-            {
-                MinReplicas = 0,
-                MaxReplicas = 5,
-                Rules =
-                {
-                    new ContainerAppScaleRule
-                    {
-                        Custom = new ContainerAppCustomScaleRule
-                        {
-                            Metadata =
-                            {
-                                { "endpoint", BicepFunction.Interpolate($"{dtsBicep.GetOutput("dts_endpoint")}") },
-                                { "taskhubName", "ship" },
-                                { "maxConcurrentWorkItemsCount", "1" },
-                                { "workItemType", "Activity" }
                             },
                             Identity = BicepFunction.Interpolate($"{identity.Resource.Id}")
                         }
@@ -236,8 +145,6 @@ if (builder.ExecutionContext.IsPublishMode)
 {
     api.WithReference(ai);
     orchestrator.WithReference(ai);
-    assembler.WithReference(ai);
-    ship.WithReference(ai);
 }
 
 builder.Build().Run();

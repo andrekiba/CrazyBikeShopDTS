@@ -2,7 +2,7 @@ using CrazyBikeShop.Shared;
 using Microsoft.DurableTask;
 using Microsoft.Extensions.Logging;
 
-namespace CrazyBikeShop.Ship;
+namespace CrazyBikeShop.Orchestrator;
 
 //[DurableTask]
 public class ShipBikeActivity(ILogger<ShipBikeActivity> logger) : TaskActivity<AssembledBike, ShippedBike>
