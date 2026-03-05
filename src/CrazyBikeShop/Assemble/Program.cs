@@ -1,4 +1,4 @@
-﻿using CrazyBikeShop.Orchestrator;
+﻿using CrazyBikeShop.Assemble;
 using CrazyBikeShop.ServiceDefaults;
 using Microsoft.DurableTask.Worker;
 using Microsoft.DurableTask.Worker.AzureManaged;
@@ -21,7 +21,7 @@ builder.Services.AddDurableTaskWorker()
     .AddTasks(registry =>
     {
         //registry.AddAllGeneratedTasks(); 
-        registry.AddOrchestrator<CrazyBikeOrchestrator>();
+        registry.AddActivity<AssembleBikeActivity>();
     })
     .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
     {
@@ -32,7 +32,7 @@ var host = builder.Build();
 
 // Get the logger
 var logger = host.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("Starting CrazyBikeOrchestrator Worker");
+logger.LogInformation("Starting Assembler worker");
 await host.StartAsync();
 
 logger.LogInformation("Worker started and waiting for tasks...");

@@ -2,9 +2,9 @@ using Aspire.Hosting.Azure;
 using Azure.Provisioning.AppContainers;
 using Azure.Provisioning.ContainerRegistry;
 using Azure.Provisioning.Expressions;
-using Azure.Provisioning.Resources;
 
 const string durableTaskDataContributor = "0ad04412-c4d5-4796-b79c-f76d14c8d402";
+const string dtsScaleRuleType = "azure-durabletask-scheduler";
 var builder = DistributedApplication.CreateBuilder(args);
 
 IResourceBuilder<ParameterResource> env = null!;
@@ -17,6 +17,7 @@ const string projectName = "cbs";
 
 if (builder.ExecutionContext.IsRunMode)
 {
+    //use the Durable Task Scheduler emulator
     var scheduler =
         builder.AddContainer("scheduler", "mcr.microsoft.com/dts/dts-emulator", "latest")
             .WithHttpEndpoint(name: "grpc", port:8080, targetPort: 8080)
@@ -30,6 +31,7 @@ else
     env = builder.AddParameter("environment");
     var userPrincipalId = builder.AddParameter("userPrincipalId");
 
+    //user assigned identity
     identity = builder.AddAzureUserAssignedIdentity("identity")
         .ConfigureInfrastructure(infra =>
         {
@@ -39,6 +41,7 @@ else
             i.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-identity").Compile();
         });
     
+    //log analytics workspace
     var log = builder.AddAzureLogAnalyticsWorkspace("log")
         .ConfigureInfrastructure(infra =>
         {
@@ -48,6 +51,7 @@ else
             log.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-log").Compile();
         });
     
+    //application insights
     ai = builder.AddAzureApplicationInsights("ai", log)
         .ConfigureInfrastructure(infra =>
         {
@@ -60,6 +64,7 @@ else
             appInsights.RetentionInDays = 30;
         });
     
+    //azure container registry
     var acr = builder.AddAzureContainerRegistry("acr")
         .ConfigureInfrastructure(infra =>    
         {
@@ -69,6 +74,7 @@ else
             acr.Name = BicepFunction.Interpolate($"{projectName.Replace("-","")}{envParam}cr").Compile();
         });
     
+    //azure container app environment
     var cae = builder.AddAzureContainerAppEnvironment("cae")
         .ConfigureInfrastructure(infra =>    
         {
@@ -80,6 +86,7 @@ else
         .WithAzureContainerRegistry(acr)
         .WithAzureLogAnalyticsWorkspace(log);
     
+    //durable task scheduler
     dtsBicep = builder.AddBicepTemplate("dts-bicep", "./bicep/dts.bicep")
         .WithParameter("dtsName", ReferenceExpression.Create($"{projectName}-{env}-dts"));
     dts = builder.AddConnectionString("dts", ReferenceExpression.Create($"Endpoint={dtsBicep.GetOutput("dts_endpoint")};TaskHub=default;Authentication=DefaultAzure"));
@@ -95,6 +102,7 @@ else
         .WithParameter("principalType", "User");
 }
 
+//api endpoint
 var api = builder.AddProject<Projects.Api>("api")
     .WithReference(dts)
     .WaitFor(dts)
@@ -107,6 +115,7 @@ var api = builder.AddProject<Projects.Api>("api")
         app.Template.Scale.MaxReplicas = 2;
     });
 
+//crazy bike orchestrator worker
 var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
     .WithReference(dts)
     .WaitFor(dts)
@@ -119,10 +128,10 @@ var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
         app.Template.Scale.PollingInterval = 5;
         app.Template.Scale.Rules.Add(new ContainerAppScaleRule
         {
-            Name = "dts-orchestration-scaler",
+            Name = "dts-orchestrator-scaler",
             Custom = new ContainerAppCustomScaleRule
             {
-                CustomScaleRuleType = "azure-durabletask-scheduler",
+                CustomScaleRuleType = dtsScaleRuleType,
                 Metadata =
                 {
                     { "endpoint", dtsBicep.GetOutput("dts_endpoint").AsProvisioningParameter(infra) },
@@ -135,12 +144,74 @@ var orchestrator = builder.AddProject<Projects.Orchestrator>("orchestrator")
         });
     });
 
+//assembler worker
+var assembler = builder.AddProject<Projects.Assemble>("assembler")
+    .WithReference(dts)
+    .WaitFor(dts)
+    .PublishAsAzureContainerApp((infra, app) =>
+    {
+        var envParam = env.AsProvisioningParameter(infra);
+        app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-assembler").Compile();
+        app.Template.Scale.MinReplicas = 0;
+        app.Template.Scale.MaxReplicas = 5;
+        app.Template.Scale.PollingInterval = 5;
+        app.Template.Scale.Rules.Add(new ContainerAppScaleRule
+        {
+            Name = "dts-assembler-scaler",
+            Custom = new ContainerAppCustomScaleRule
+            {
+                CustomScaleRuleType = dtsScaleRuleType,
+                Metadata =
+                {
+                    { "endpoint", dtsBicep.GetOutput("dts_endpoint").AsProvisioningParameter(infra) },
+                    { "taskhubName", dtsBicep.GetOutput("taskhub_name").AsProvisioningParameter(infra) },
+                    { "maxConcurrentWorkItemsCount", "1" },
+                    { "workItemType", "Activity" }
+                },
+                Identity = identity.Resource.Id.AsProvisioningParameter(infra)
+            }
+        });
+    });
+
+//shipper worker
+var shipper = builder.AddProject<Projects.Ship>("shipper")
+    .WithReference(dts)
+    .WaitFor(dts)
+    .PublishAsAzureContainerApp((infra, app) =>
+    {
+        var envParam = env.AsProvisioningParameter(infra);
+        app.Name = BicepFunction.Interpolate($"{projectName}-{envParam}-shipper").Compile();
+        app.Template.Scale.MinReplicas = 0;
+        app.Template.Scale.MaxReplicas = 5;
+        app.Template.Scale.PollingInterval = 5;
+        app.Template.Scale.Rules.Add(new ContainerAppScaleRule
+        {
+            Name = "dts-shipper-scaler",
+            Custom = new ContainerAppCustomScaleRule
+            {
+                CustomScaleRuleType = dtsScaleRuleType,
+                Metadata =
+                {
+                    { "endpoint", dtsBicep.GetOutput("dts_endpoint").AsProvisioningParameter(infra) },
+                    { "taskhubName", dtsBicep.GetOutput("taskhub_name").AsProvisioningParameter(infra) },
+                    { "maxConcurrentWorkItemsCount", "1" },
+                    { "workItemType", "Activity" }
+                },
+                Identity = identity.Resource.Id.AsProvisioningParameter(infra)
+            }
+        });
+    });
+
 if (builder.ExecutionContext.IsPublishMode)
 {
     api.WithReference(ai);
     api.WithAzureUserAssignedIdentity(identity);
     orchestrator.WithReference(ai);
     orchestrator.WithAzureUserAssignedIdentity(identity);
+    assembler.WithReference(ai);
+    assembler.WithAzureUserAssignedIdentity(identity);
+    shipper.WithReference(ai);
+    shipper.WithAzureUserAssignedIdentity(identity);
 }
 
 builder.Build().Run();

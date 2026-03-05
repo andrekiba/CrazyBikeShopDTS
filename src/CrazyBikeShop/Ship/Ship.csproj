@@ -5,9 +5,9 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <AssemblyName>CrazyBikeShop.Ship</AssemblyName>
+        <RootNamespace>CrazyBikeShop.Ship</RootNamespace>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-        <AssemblyName>CrazyBikeShop.Orchestrator</AssemblyName>
-        <RootNamespace>CrazyBikeShop.Orchestrator</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -16,10 +16,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.DurableTask.Generators" Version="2.0.0-preview.1" />
-      <PackageReference Include="Microsoft.DurableTask.Worker.AzureManaged" Version="1.22.0" />
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
-      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.3" />
+        <PackageReference Include="Microsoft.DurableTask.Generators" Version="2.0.0-preview.1" />
+        <PackageReference Include="Microsoft.DurableTask.Worker.AzureManaged" Version="1.17.1" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
     </ItemGroup>
 
     <ItemGroup>

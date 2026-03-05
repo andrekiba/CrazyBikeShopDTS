@@ -16,7 +16,7 @@ public static class CrazyBikeSelector
         "bdc-endurance", "gravel", "ciclocross", "trekking", "urban"
     ];
     
-    public static Bike GetOne(string? model = null)
+    public static Bike GetOne(string model = null)
     {
         var bikePartGen = new Faker<BikePart>()
             .RuleFor(x => x.Id, () => Guid.NewGuid().ToString())
