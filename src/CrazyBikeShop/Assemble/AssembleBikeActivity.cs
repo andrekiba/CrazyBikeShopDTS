@@ -8,7 +8,7 @@ namespace CrazyBikeShop.Assemble;
 /// Assemble the bike. This activity is registered only in Assembler worker,
 /// so DTS will route AssembleBikeActivity work items exclusively to Assembler worker.
 /// </summary>
-//[DurableTask(nameof(AssembleBikeActivity))]
+[DurableTask(nameof(AssembleBikeActivity))]
 public class AssembleBikeActivity(ILogger<AssembleBikeActivity> logger) : TaskActivity<Bike, AssembledBike>
 {
     public override async Task<AssembledBike> RunAsync(TaskActivityContext context, Bike bike)

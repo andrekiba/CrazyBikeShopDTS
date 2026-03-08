@@ -8,7 +8,7 @@ namespace CrazyBikeShop.Ship;
 /// Ship the bike. This activity is registered only in Shipper worker,
 /// so DTS will route ShipBikeActivity work items exclusively to Ship worker.
 /// </summary>
-//[DurableTask(nameof(ShipBikeActivity))]
+[DurableTask(nameof(ShipBikeActivity))]
 public class ShipBikeActivity(ILogger<ShipBikeActivity> logger) : TaskActivity<AssembledBike, ShippedBike>
 {
     public override async Task<ShippedBike> RunAsync(TaskActivityContext context, AssembledBike assembledBike)
