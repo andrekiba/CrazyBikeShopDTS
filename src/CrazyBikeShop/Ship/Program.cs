@@ -24,9 +24,10 @@ builder.Services.AddDurableTaskWorker()
         registry.AddAllGeneratedTasks(); 
         //registry.AddActivity<ShipBikeActivity>();
     })
+    //workaround, until DTS patch is released
     .UseWorkItemFilters(new DurableTaskWorkerWorkItemFilters
     {
-        Orchestrations = [],
+        Orchestrations = [new DurableTaskWorkerWorkItemFilters.OrchestrationFilter("NA", null) ],
         Activities = [new DurableTaskWorkerWorkItemFilters.ActivityFilter(nameof(ShipBikeActivity), null)]
     })
     .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>

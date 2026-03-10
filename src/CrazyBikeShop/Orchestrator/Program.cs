@@ -23,10 +23,11 @@ builder.Services.AddDurableTaskWorker()
         //registry.AddAllGeneratedTasks(); 
         registry.AddOrchestrator<CrazyBikeOrchestrator>();
     })
+    //workaround, until DTS patch is released
     .UseWorkItemFilters(new DurableTaskWorkerWorkItemFilters
     {
         Orchestrations = [new DurableTaskWorkerWorkItemFilters.OrchestrationFilter(nameof(CrazyBikeOrchestrator), null)],
-        Activities = []
+        Activities = [new DurableTaskWorkerWorkItemFilters.ActivityFilter("NA", null) ]
     })
     .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
     {
