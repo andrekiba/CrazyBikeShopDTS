@@ -24,10 +24,11 @@ builder.Services.AddDurableTaskWorker()
         registry.AddAllGeneratedTasks(); 
         //registry.AddActivity<AssembleBikeActivity>();
     })
-    // .UseWorkItemFilters(new DurableTaskWorkerWorkItemFilters
-    // {
-    //     Activities = [new DurableTaskWorkerWorkItemFilters.ActivityFilter(nameof(AssembleBikeActivity), null)]
-    // })
+    .UseWorkItemFilters(new DurableTaskWorkerWorkItemFilters
+    {
+        Orchestrations = [],
+        Activities = [new DurableTaskWorkerWorkItemFilters.ActivityFilter(nameof(AssembleBikeActivity), null)]
+    })
     .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
     {
         // Configure any options if needed

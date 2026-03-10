@@ -24,6 +24,11 @@ builder.Services.AddDurableTaskWorker()
         registry.AddAllGeneratedTasks(); 
         //registry.AddActivity<ShipBikeActivity>();
     })
+    .UseWorkItemFilters(new DurableTaskWorkerWorkItemFilters
+    {
+        Orchestrations = [],
+        Activities = [new DurableTaskWorkerWorkItemFilters.ActivityFilter(nameof(ShipBikeActivity), null)]
+    })
     .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
     {
         // Configure any options if needed

@@ -23,6 +23,11 @@ builder.Services.AddDurableTaskWorker()
         //registry.AddAllGeneratedTasks(); 
         registry.AddOrchestrator<CrazyBikeOrchestrator>();
     })
+    .UseWorkItemFilters(new DurableTaskWorkerWorkItemFilters
+    {
+        Orchestrations = [new DurableTaskWorkerWorkItemFilters.OrchestrationFilter(nameof(CrazyBikeOrchestrator), null)],
+        Activities = []
+    })
     .UseDurableTaskScheduler(Environment.GetEnvironmentVariable("ConnectionStrings__dts")!, options =>
     {
         // Configure any options if needed
