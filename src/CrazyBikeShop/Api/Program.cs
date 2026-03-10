@@ -36,9 +36,9 @@ app.MapScalarApiReference();
 
 app.UseHttpsRedirection();
 
-app.MapPost("/schedule", async ([FromServices] DurableTaskClient durableTaskClient) =>
+app.MapPost("/buy", async ([FromServices] DurableTaskClient durableTaskClient) =>
 {
-    var scheduleRequest = new ScheduleRequest
+    var orchestrationRequest = new OrchestrationRequest
     {
         Id = Guid.NewGuid().ToString(),
         OrchestrationName = "CrazyBikeOrchestrator",
@@ -49,25 +49,25 @@ app.MapPost("/schedule", async ([FromServices] DurableTaskClient durableTaskClie
     {
         var startOrchestrationOptions = new StartOrchestrationOptions
         {
-            InstanceId = scheduleRequest.Id
+            InstanceId = orchestrationRequest.Id
         };
         
-        var instanceId = await durableTaskClient.ScheduleNewOrchestrationInstanceAsync(scheduleRequest.OrchestrationName, scheduleRequest.Input, startOrchestrationOptions);
+        var instanceId = await durableTaskClient.ScheduleNewOrchestrationInstanceAsync(orchestrationRequest.OrchestrationName, orchestrationRequest.Input, startOrchestrationOptions);
         //var metadata = await durableTaskClient.WaitForInstanceStartAsync(instanceId);
 
-        app.Logger.LogInformation("Created new schedule with ID: {ScheduleId}", scheduleRequest.Id);
+        app.Logger.LogInformation("Created new orchestration with ID: {Orchestration}", orchestrationRequest.Id);
         
-        return Results.CreatedAtRoute("GetOrchestration", new { id = scheduleRequest.Id });
+        return Results.CreatedAtRoute("GetOrchestration", new { id = orchestrationRequest.Id });
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error creating schedule {ScheduleId}", scheduleRequest.Id);
+        app.Logger.LogError(ex, "Error creating orchestration {Orchestration}", orchestrationRequest.Id);
         return Results.InternalServerError(ex.Message);
     }
 })
-.WithName("ScheduleOrchestration");
+.WithName("Buy");
 
-app.MapGet("/schedule/{id}", async (string id, 
+app.MapGet("/orchestration/{id}", async (string id, 
         [FromServices] DurableTaskClient durableTaskClient) =>
 {
     try
@@ -77,7 +77,7 @@ app.MapGet("/schedule/{id}", async (string id,
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving schedule {ScheduleId}", id);
+        app.Logger.LogError(ex, "Error retrieving orchestration {Orchestration}", id);
         return Results.InternalServerError(ex.Message);
     }
 })

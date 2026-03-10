@@ -1,6 +1,6 @@
 ﻿namespace Api;
 
-public record ScheduleRequest
+public record OrchestrationRequest
 {
     public required string Id { get; set; }
     public required string OrchestrationName { get; set; }
