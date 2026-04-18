@@ -23,6 +23,10 @@ public class CrazyBikeOrchestrator : TaskOrchestrator<Bike, string>
         {
             // Step 1: Assemble the bike (routed to Assembler worker)
             logger.LogInformation("Starting bike assembly for Bike ID: {BikeId}", bike.Id);
+            // var activityOptions = new TaskOptions
+            // {
+            //     Retry = new TaskRetryOptions(new RetryPolicy(2, TimeSpan.FromSeconds(1), 2))
+            // };
             var assembledBike = await context.CallActivityAsync<AssembledBike>(Activities.AssembleBikeActivity, bike);
             
             // Step 2: Ship the bike (routed to Shipping worker)
